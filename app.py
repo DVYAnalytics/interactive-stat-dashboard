@@ -82,7 +82,6 @@ with tab2:
         color_var = col_color.selectbox("Color By (Optional)", categorical_cols)
 
         color_arg = None if color_var == "None" else color_var
-
         # Prepare a clean plot DataFrame to prevent duplicate key errors when x_var == y_var
         plot_df = pd.DataFrame({
             x_var: df[x_var],
@@ -94,17 +93,40 @@ with tab2:
         if color_arg:
             plot_df[color_arg] = df[color_arg]
 
+        # Enhanced Scatter Plot with High-Contrast Trend Line
         fig = px.scatter(
             plot_df,
             x=x_var,
             y=y_col_name,
             color=color_arg,
             trendline="ols" if color_var == "None" else None,
-            title=f"{y_var} vs. {x_var}",
+            trendline_color_override="#E63946",  # Vibrant Red trendline
+            title=f"<b>{y_var}</b> vs. <b>{x_var}</b>",
             labels={y_col_name: y_var},
-            template="plotly_white"
+            template="plotly_dark"
         )
+
+        # Style the points if no grouping color is selected
+        if color_var == "None":
+            fig.update_traces(
+                marker=dict(size=8, color="#00B4D8", opacity=0.7, line=dict(width=1, color="white"))
+            )
+
         st.plotly_chart(fig, use_container_width=True)
+
+        # Enhanced High-Contrast Correlation Heatmap
+        st.subheader("Correlation Heatmap")
+        corr = df[numeric_cols].corr()
+        fig_corr = px.imshow(
+            corr,
+            text_auto=".2f",  # Clean 2-decimal numbers
+            color_continuous_scale="Viridis",  # High-contrast color palette
+            aspect="auto",
+            template="plotly_dark"
+        )
+        fig_corr.update_layout(margin=dict(l=40, r=40, t=40, b=40))
+
+        st.plotly_chart(fig_corr, use_container_width=True)
 
         # Correlation Heatmap
         st.subheader("Correlation Heatmap")
