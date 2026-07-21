@@ -82,13 +82,26 @@ with tab2:
         color_var = col_color.selectbox("Color By (Optional)", categorical_cols)
 
         color_arg = None if color_var == "None" else color_var
-        # Ensure all column names are strictly unique for Plotly
-        df = df.loc[:, ~df.columns.duplicated()]
+
+        # Prepare a clean plot DataFrame to prevent duplicate key errors when x_var == y_var
+        plot_df = pd.DataFrame({
+            x_var: df[x_var],
+            f"{y_var}_y" if x_var == y_var else y_var: df[y_var]
+        })
+
+        y_col_name = f"{y_var}_y" if x_var == y_var else y_var
+
+        if color_arg:
+            plot_df[color_arg] = df[color_arg]
 
         fig = px.scatter(
-            df, x=x_var, y=y_var, color=color_arg,
+            plot_df,
+            x=x_var,
+            y=y_col_name,
+            color=color_arg,
             trendline="ols" if color_var == "None" else None,
             title=f"{y_var} vs. {x_var}",
+            labels={y_col_name: y_var},
             template="plotly_white"
         )
         st.plotly_chart(fig, use_container_width=True)
