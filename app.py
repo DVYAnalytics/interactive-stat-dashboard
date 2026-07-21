@@ -87,20 +87,17 @@ with tab2:
 
         fig = px.scatter(
             df, x=x_var, y=y_var, color=color_arg,
-            ...
-        )
-        fig = px.scatter(
-            df, x=x_var, y=y_var, color=color_arg,
             trendline="ols" if color_var == "None" else None,
             title=f"{y_var} vs. {x_var}",
             template="plotly_white"
         )
-        st.plotly_chart(fig, width="stretch")
+        st.plotly_chart(fig, use_container_width=True)
 
+        # Correlation Heatmap
         st.subheader("Correlation Heatmap")
         corr = df[numeric_cols].corr()
         fig_corr = px.imshow(corr, text_auto=True, color_continuous_scale="Blues", aspect="auto")
-        st.plotly_chart(fig_corr, width="stretch")
+        st.plotly_chart(fig_corr, use_container_width=True)
     else:
         st.warning("Not enough numeric columns for dynamic plotting.")
 
