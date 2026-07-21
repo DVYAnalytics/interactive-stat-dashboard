@@ -82,7 +82,13 @@ with tab2:
         color_var = col_color.selectbox("Color By (Optional)", categorical_cols)
 
         color_arg = None if color_var == "None" else color_var
+        # Ensure all column names are strictly unique for Plotly
+        df = df.loc[:, ~df.columns.duplicated()]
 
+        fig = px.scatter(
+            df, x=x_var, y=y_var, color=color_arg,
+            ...
+        )
         fig = px.scatter(
             df, x=x_var, y=y_var, color=color_arg,
             trendline="ols" if color_var == "None" else None,
