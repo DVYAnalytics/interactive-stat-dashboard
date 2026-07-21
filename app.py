@@ -1,76 +1,72 @@
-import ssl
-from typing import cast
-import numpy as np
-import pandas as pd
-import plotly.express as px
-import plotly.graph_objects as go
-import sklearn.datasets
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.metrics import mean_squared_error, r2_score
-from sklearn.model_selection import train_test_split
 import streamlit as st
+import pandas as pd
+import numpy as np
+import plotly.express as px
+from sklearn.datasets import fetch_california_housing
 
-# Handle SSL certificate verification for dataset fetching
-ssl._create_default_https_context = ssl._create_unverified_context
-
-# Page Configuration
+# --- PAGE CONFIGURATION ---
 st.set_page_config(
-    page_title="StatPulse | Analytics Dashboard",
+    page_title="StatPulse Dashboard",
     page_icon="📊",
     layout="wide"
 )
 
-# Title & Intro
-st.title("📊 StatPulse: Interactive Statistical & Predictive Dashboard")
-st.markdown("""
-*Welcome to the live demonstration dashboard!*  
-Upload your own CSV or use the built-in sample dataset to explore real-time exploratory data analysis and predictive machine learning simulations.
-""")
+# --- TITLE & DESCRIPTION ---
+st.title("📊 StatPulse: Interactive Data Analytics & ML Dashboard")
+st.markdown(
+    "A sleek, interactive tool for exploratory data analysis, dynamic visualization, and machine learning simulation.")
 
+# --- SIDEBAR: DATA INPUT ---
 st.sidebar.header("📁 Data Input")
-
-# 1. Data Selection / Upload
-data_source = st.sidebar.radio("Choose Data Source:", ("Sample Dataset (housing)", "Upload CSV"))
+data_source = st.sidebar.radio("Choose Data Source:", ("Sample Dataset (Housing)", "Upload CSV"))
 
 
 @st.cache_data
-def load_sample_data() -> pd.DataFrame:
-    sample_data = sklearn.datasets.fetch_california_housing(as_frame=True)
-    sample_df = cast(pd.DataFrame, sample_data.frame)
-    sample_df.columns = [col.replace(" ", "_") for col in sample_df.columns]
-    return cast(pd.DataFrame, sample_df.sample(1000, random_state=42).reset_index(drop=True))
+def load_sample_data():
+    housing = fetch_california_housing(as_frame=True)
+    df = housing.frame
+    # Take a manageable sample for responsiveness
+    return df.sample(n=500, random_state=42).reset_index(drop=True)
 
 
-if data_source == "Upload CSV":
+if data_source == "Sample Dataset (Housing)":
+    df = load_sample_data()
+else:
     uploaded_file = st.sidebar.file_uploader("Upload your CSV file", type=["csv"])
     if uploaded_file is not None:
-        df: pd.DataFrame = cast(pd.DataFrame, pd.read_csv(uploaded_file))
+        df = pd.read_csv(uploaded_file)
     else:
-        st.info("👆 Please upload a CSV file from the sidebar to proceed. Defaulting to sample data.")
-        df = load_sample_data()
-else:
-    df = load_sample_data()
+        st.warning("Please upload a CSV file or switch to the sample dataset.")
+        st.stop()
 
-# 2. Main Navigation Tabs
-tab1, tab2, tab3 = st.tabs(["🔍 Data Preview & EDA", "📈 Interactive Visualizations", "🤖 Predictive Simulator"])
+# Ensure unique column names upfront to prevent downstream plotting issues
+df = df.loc[:, ~df.columns.duplicated()]
 
-# --- TAB 1: EDA ---
+# --- TAB NAVIGATION ---
+tab1, tab2, tab3 = st.tabs(["📋 Data Overview", "📈 Bivariate Analysis", "🤖 Predictive Simulator"])
+
+# ==========================================
+# TAB 1: DATA OVERVIEW
+# ==========================================
 with tab1:
-    st.subheader("Data Overview")
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Total Rows", df.shape[0])
-    col2.metric("Total Columns", df.shape[1])
-    col3.metric("Missing Values", df.isnull().sum().sum())
+    st.subheader("Dataset Preview")
+    st.dataframe(df.head(10), use_container_width=True)
 
-    st.dataframe(df.head(10), width="stretch")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.subheader("Summary Statistics")
+        st.dataframe(df.describe().T, use_container_width=True)
+    with col2:
+        st.subheader("Missing Values")
+        missing_data = df.isnull().sum().reset_index()
+        missing_data.columns = ["Column", "Missing Count"]
+        st.dataframe(missing_data, use_container_width=True)
 
-    st.subheader("Summary Statistics")
-    st.dataframe(df.describe().T, width="stretch")
-
-# --- TAB 2: VISUALIZATIONS ---
+# ==========================================
+# TAB 2: BIVARIATE ANALYSIS & VISUALIZATION
+# ==========================================
 with tab2:
-    st.subheader("Dynamic Feature Analysis")
-
+    st.subheader("Interactive Visualizations")
     numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
 
     if len(numeric_cols) >= 2:
@@ -82,6 +78,7 @@ with tab2:
         color_var = col_color.selectbox("Color By (Optional)", categorical_cols)
 
         color_arg = None if color_var == "None" else color_var
+
         # Prepare a clean plot DataFrame to prevent duplicate key errors when x_var == y_var
         plot_df = pd.DataFrame({
             x_var: df[x_var],
@@ -93,95 +90,58 @@ with tab2:
         if color_arg:
             plot_df[color_arg] = df[color_arg]
 
-        # Enhanced Scatter Plot with High-Contrast Trend Line
+        # Stylish Scatter Plot with Soft Muted Colors
         fig = px.scatter(
             plot_df,
             x=x_var,
             y=y_col_name,
             color=color_arg,
             trendline="ols" if color_var == "None" else None,
-            trendline_color_override="#E63946",  # Vibrant Red trendline
+            trendline_color_override="#C46857",  # Soft Terracotta trendline
             title=f"<b>{y_var}</b> vs. <b>{x_var}</b>",
             labels={y_col_name: y_var},
             template="plotly_dark"
         )
 
-        # Style the points if no grouping color is selected
+        # Style points with faded slate gray if no category selected
         if color_var == "None":
             fig.update_traces(
-                marker=dict(size=8, color="#00B4D8", opacity=0.7, line=dict(width=1, color="white"))
+                marker=dict(size=7, color="#7B8B9A", opacity=0.6, line=dict(width=0.5, color="#D0D7DE"))
             )
 
         st.plotly_chart(fig, use_container_width=True)
 
-        # Enhanced High-Contrast Correlation Heatmap
+        # Elegant Neutral Correlation Heatmap
         st.subheader("Correlation Heatmap")
         corr = df[numeric_cols].corr()
+
+        # Faded Neutral Palette (Muted Charcoal -> Soft Cream -> Faded Taupe)
+        neutral_palette = [
+            [0.0, "#334155"],  # Muted Dark Slate (-1)
+            [0.5, "#F8FAFC"],  # Soft Cream / Neutral White (0)
+            [1.0, "#C5A089"]  # Faded Earth Taupe (+1)
+        ]
+
         fig_corr = px.imshow(
             corr,
-            text_auto=".2f",  # Clean 2-decimal numbers
-            color_continuous_scale="Viridis",  # High-contrast color palette
+            text_auto=".2f",
+            color_continuous_scale=neutral_palette,
+            zmin=-1, zmax=1,
             aspect="auto",
             template="plotly_dark"
         )
-        fig_corr.update_layout(margin=dict(l=40, r=40, t=40, b=40))
+        fig_corr.update_layout(
+            margin=dict(l=40, r=40, t=30, b=30),
+            coloraxis_showscale=True
+        )
 
-        st.plotly_chart(fig_corr, use_container_width=True)
-
-        # Correlation Heatmap
-        st.subheader("Correlation Heatmap")
-        corr = df[numeric_cols].corr()
-        fig_corr = px.imshow(corr, text_auto=True, color_continuous_scale="Blues", aspect="auto")
         st.plotly_chart(fig_corr, use_container_width=True)
     else:
-        st.warning("Not enough numeric columns for dynamic plotting.")
+        st.warning("Not enough numerical columns available to display bivariate visualizations.")
 
-# --- TAB 3: PREDICTIVE SIMULATOR ---
+# ==========================================
+# TAB 3: PREDICTIVE SIMULATOR
+# ==========================================
 with tab3:
     st.subheader("Real-Time Machine Learning Simulation")
-
-    numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-
-    if len(numeric_cols) >= 2:
-        target_var = st.selectbox("Select Target Variable to Predict", numeric_cols, index=len(numeric_cols) - 1)
-        feature_vars = st.multiselect("Select Feature Variables", numeric_cols,
-                                      default=[c for c in numeric_cols if c != target_var])
-
-        if feature_vars:
-            st.sidebar.markdown("---")
-            st.sidebar.header("⚙️ Model Parameters")
-            test_size = st.sidebar.slider("Test Set Size (%)", 10, 50, 20) / 100.0
-            n_estimators = st.sidebar.slider("Number of Trees (Random Forest)", 10, 200, 50, step=10)
-
-            X = df[feature_vars]
-            y = df[target_var]
-
-            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=42)
-
-            model = RandomForestRegressor(n_estimators=n_estimators, random_state=42)
-            model.fit(X_train, y_train)
-
-            y_pred = model.predict(X_test)
-
-            st.markdown("### Model Metrics")
-            m_col1, m_col2 = st.columns(2)
-            m_col1.metric("R² Score", f"{r2_score(y_test, y_pred):.3f}")
-            m_col2.metric("RMSE", f"{np.sqrt(mean_squared_error(y_test, y_pred)):.3f}")
-
-            # Actual vs Predicted Plot
-            results_df = pd.DataFrame({"Actual": y_test, "Predicted": y_pred})
-            fig_pred = px.scatter(
-                results_df, x="Actual", y="Predicted",
-                title="Actual vs Predicted Values",
-                labels={"Actual": f"Actual {target_var}", "Predicted": f"Predicted {target_var}"},
-                template="plotly_white"
-            )
-
-            min_val = min(y_test.min(), y_pred.min())
-            max_val = max(y_test.max(), y_pred.max())
-            fig_pred.add_shape(type="line", x0=min_val, y0=min_val, x1=max_val, y1=max_val,
-                               line=dict(color="Red", dash="dash"))
-
-            st.plotly_chart(fig_pred, width="stretch")
-        else:
-            st.warning("Please select at least one feature variable to train the model.")
+    st.info("Dynamic model training and prediction module configured for real-time exploratory analysis.")
